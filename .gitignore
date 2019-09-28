@@ -1,0 +1,6 @@
+*.orig
+*.patch
+*.rej
+*.test
+/.idea/
+/sandbox

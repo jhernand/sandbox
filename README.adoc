@@ -1,0 +1,71 @@
+= Testing sandbox
+
+This project contains a tool that runs _Go_ tests inside an _OpenShift_ project
+created just for that.
+
+The tool does the following:
+
+- Finds the directories containing `_test.go` files and builds the
+  corresponding `.test` binaries using the `go test -c ...` command.
+
+- Creates a new project inside the _OpenShift_ cluster.
+
+- Starts a server inside the _OpenShift_ cluster. This server provides a REST
+  API that the tool will use to send the test binaries and to receive the
+  results of their execution.
+
+- Sends the test binaries to the server and waits for the results.
+
+- Prints the results.
+
+- Deletes the project created inside the _OpenShift_ cluster.
+
+The tests that run inside the _OpenShift_ cluster have all permissions inside
+the project, so they can create additional _OpenShift_ objects as required. All
+those objects will be automatically removed when the tests finish.
+
+To simplify some common tasks the tests can also use the `Sandbox` type.
+Currently this type supports the creation of a _PostgreSQL_ database. For
+example, a test that requires a database could be written as follows:
+
+[source,go]
+----
+import (
+	"database/sql"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
+	_ "github.com/lib/pq"
+
+	"github.com/jhernand/sandbox/pkg/sandbox"
+)
+
+var _ = Describe("Database", func() {
+	It("Can connect to the database", func() {
+		// Create the sandbox:
+		sb, err := sandbox.NewSandbox().Build()
+		Expect(err).ToNot(HaveOccurred())
+		defer sb.Destroy()
+
+		// Create the database:
+		db, err := sb.Database()
+		Expect(err).ToNot(HaveOccurred())
+		defer db.Destroy()
+
+		// Connect to the database:
+		handle, err := sql.Open("postgres", db.Source())
+		Expect(err).ToNot(HaveOccurred())
+		defer handle.Close()
+
+		// Run a simple query:
+		rows, err := handle.Query("SELECT NULL")
+		Expect(err).ToNot(HaveOccurred())
+		defer rows.Close()
+	})
+})
+----
+
+This database will be created the first time that the `sb.Database()` method is
+called and will be automatically removed when the execution of the tests
+finishes.
